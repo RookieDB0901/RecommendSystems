@@ -1,6 +1,7 @@
 import math
 import numpy as np
 import random
+from utils import Dataset, Metrics
 class Dataset():
 
     def __init__(self, fp):
@@ -32,7 +33,7 @@ class Dataset():
 
         return convert_dict(train), convert_dict(test)
 
-class Metric():
+class Metrics():
 
     def __init__(self, train, test, GetRecommendation):
         self.train = train
@@ -169,7 +170,7 @@ class Experiment():
         :return: 各指标的值
         '''
         getRecommendation = self.LFM(train, self.K, self.N, self.lr, self.step, self.ratio, self.lmbda)
-        metric = Metric(train, test, getRecommendation)
+        metric = Metrics(train, test, getRecommendation)
         return metric.eval()
 
     # 多次实验取平均
