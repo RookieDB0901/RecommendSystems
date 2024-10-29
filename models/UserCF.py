@@ -1,78 +1,7 @@
 import math
 import random
-class Dataset():
+from utils import Dataset, Metrics
 
-    def __init__(self, fp):
-        self.data = self.loadData(fp)
-
-    def loadData(self, fp):
-        data = []
-        for line in open(fp, "r"):
-            data.append(tuple(map(int,line.strip().split("::")[:2])))
-        return data
-
-    def splitData(self, M, K, seed=1):
-        test, train = [], []
-        random.seed(seed)
-        for user, item in self.data:
-            if random.randint(0, M-1) == K:
-                test.append((user, item))
-            else:
-                train.append((user, item))
-
-        def convert_dict(data):
-            data_dict = {}
-            for user, item in data:
-                if user not in data_dict:
-                    data_dict[user] = set()
-                data_dict[user].add(item)
-            data_dict = {user: list(items) for user, items in data_dict.items()}
-            return data_dict
-
-        return convert_dict(train), convert_dict(test)
-
-class Metrics():
-
-    def __init__(self, train, test, GetRecommendation):
-        self.train = train
-        self.test = test
-        self.GetRecommendaion = GetRecommendation
-        self.recs = self.getRec()
-
-    def getRec(self):
-        recs = {}
-        for user in self.test:
-            if user not in recs:
-                recs[user] = self.GetRecommendaion(user)
-        return recs
-
-    def precision(self):
-        total, hit = 0, 0
-        for user in self.test:
-            test_items = set(self.test[user])
-            for item, _ in self.recs[user]:
-                if item in test_items:
-                    hit += 1
-                total += 1
-        return round(hit / total * 100, 2)
-
-    def recall(self):
-        total, hit = 0, 0
-        for user in self.test:
-            test_items = set(self.test[user])
-            for item, _ in self.recs[user]:
-                if item in test_items:
-                    hit += 1
-            total += len(test_items)
-        return round(hit / total * 100, 2)
-
-    def eval(self):
-        metric = {
-            "precision": self.precision(),
-            "recall": self.recall()
-        }
-        print("Metric:", metric)
-        return metric
 
 # 随机推荐
 def Random(train, N, K):
@@ -93,18 +22,19 @@ def Random(train, N, K):
 def MostPopular(train, N, K):
     items = {}
     for user in train:
-        for item in train(user):
+        for item in train[user]:
             if item not in items:
                 items[item] = 0
             items[item] += 1
 
     def GetRecommendation(user):
         seen_items = set(train[user])
-        recs = {k: items[k] for k in item.items() if k not in seen_items}
+        recs = {k: items[k] for k in items if k not in seen_items}
         recs = list(sorted(recs.items(), key=lambda x: x[1], reverse=True))
         return recs[:K]
 
     return GetRecommendation
+
 
 def UserCF(train, N, K):
     """
@@ -137,7 +67,7 @@ def UserCF(train, N, K):
                 v = users[j]
                 if v not in sim[u]:
                     sim[u][v] = 0
-                sum[u][v] += 1
+                sim[u][v] += 1
     for u in sim:
         for v in sim[u]:
             sim[u][v] /= math.sqrt(num[u] * num[v])
@@ -158,6 +88,7 @@ def UserCF(train, N, K):
         return recs
     return GetRecommendatiion
 
+
 class Experiment():
 
     def __init__(self, M, N, K, fp, rt = "UserCF"):
@@ -174,7 +105,7 @@ class Experiment():
         return metric.eval()
 
     def run(self):
-        metrics = {"precision": 0, "recall": 0}
+        metrics = {"Precision": 0, "Recall": 0}
         dataset = Dataset(self.fp)
         for i in range(self.M):
             train, test = dataset.splitData(self.M, i)
@@ -184,13 +115,27 @@ class Experiment():
         print('Average Result (M={}, N={}, K={}): {}'.format(self.M, self.N, self.K, metrics))
 
 fp = "./dataset/ml-1m/ratings.dat"
+
+# 1. Random实验
+print("Random:")
 M, K = 8, 10
 N = 0 # 为保持一致而设置，随便填一个值
 random_exp = Experiment(M, N, K, fp, rt='Random')
 random_exp.run()
 
+# 2. MostPopular实验
+print("MostPopular:")
+M, N = 8, 10
+K = 0 # 为保持一致而设置，随便填一个值
+mp_exp = Experiment(M, K, N, fp, rt='MostPopular')
+mp_exp.run()
 
-
+# 3. UserCF实验
+print("UserFC:")
+M, N = 8, 10
+for K in [5, 10, 20, 40, 80, 160]:
+    cf_exp = Experiment(M, K, N, fp, rt='UserCF')
+    cf_exp.run()
 
 
 

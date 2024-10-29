@@ -20,22 +20,30 @@ print(val.head())
 data = pd.concat((train, val, test))
 print(data.head())
 
+# dense_feas：离散特征 sparse_feas：连续特征
 dense_feas = ['I' + str(i) for i in range(1, 14)]
 sparse_feas = ['C' + str(i) for i in range(1, 27)]
+# 每个离散特征的取值个数
 sparse_val_nums = {}
 for fea in sparse_feas:
     sparse_val_nums[fea] = data[fea].nunique()
 feature_info = [dense_feas, sparse_feas, sparse_val_nums]
 
+# 导入DataLoader
 td_train = TensorDataset(torch.tensor(train.drop(columns='Label').values).float(), torch.tensor(train['Label'].values).float())
 td_val = TensorDataset(torch.tensor(val.drop(columns='Label').values).float(), torch.tensor(val['Label'].values).float())
-
 train_set = DataLoader(td_train, shuffle=True, batch_size=16)
 val_set = DataLoader(td_val, shuffle=True, batch_size=16)
 
+
+# 残差网络块
 class ResBlock(nn.Module):
 
     def __init__(self, hidden, n_dim):
+        """
+        :param hidden: 隐藏层维度
+        :param n_dim: 输入/输出维度
+        """
         super(ResBlock, self).__init__()
         self.linear1 = nn.Linear(n_dim, hidden)
         self.linear2 = nn.Linear(hidden, n_dim)
@@ -44,6 +52,7 @@ class ResBlock(nn.Module):
     def forward(self, x):
         res = self.linear2(self.relu(self.linear1(x)))
         return self.relu(res + x)
+
 
 class DeepCrossing(nn.Module):
 
@@ -57,9 +66,13 @@ class DeepCrossing(nn.Module):
         """
         super(DeepCrossing, self).__init__()
         self.dense_feas, self.sparse_feas, self.sparse_val_nums = feature_info
+
+        # 字典里的每个key-value对应一个离散特征的embedding层
         self.embeddings = nn.ModuleDict({"embed_" + str(key): nn.Embedding(num_embeddings=val, embedding_dim=embed_dim) for key, val in self.sparse_val_nums.items()})
+        # dim_stack: 离散特征embedding后和连续特征拼接的总维度
         embed_dim_sum = sum([embed_dim] * len(self.sparse_feas))
         dim_stack = embed_dim_sum + len(self.dense_feas)
+        # 由多个残差块构成的神经网络
         self.res_layers = nn.ModuleList([ResBlock(hidden, dim_stack) for hidden in hiddens])
         self.dropout = nn.Dropout(dropout)
         self.linear = nn.Linear(dim_stack, dim_output)
@@ -77,14 +90,9 @@ class DeepCrossing(nn.Module):
         output = F.sigmoid(output)
         return output
 
+# hiddens里的每个值代表一个残差块里的隐藏层维度
 hiddens = [64, 128, 256, 128, 64, 32]
 net = DeepCrossing(feature_info, hiddens)
-summary(net, input_shape=(train.shape[1],))
-
-for fea, label in iter(train_set):
-    out = net(fea)
-    print(out)
-    break
 
 
 def auc(y_pred, y_true):
@@ -157,9 +165,7 @@ for epoch in range(1, epochs + 1):
     dfhistory.loc[epoch - 1] = info
 
     # 打印epoch级别日志
-    print(("\nEPOCH = %d, loss = %.3f," + metric_name + \
-           "  = %.3f, val_loss = %.3f, " + "val_" + metric_name + " = %.3f")
-          % info)
+    print(("\nEPOCH = %d, loss = %.3f," + metric_name + "  = %.3f, val_loss = %.3f, " + "val_" + metric_name + " = %.3f") % info)
     nowtime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     print("\n" + "==========" * 8 + "%s" % nowtime)
 
