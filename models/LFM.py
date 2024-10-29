@@ -1,78 +1,8 @@
 import math
 import numpy as np
 import random
-class Dataset():
+from utils import Dataset, Metrics
 
-    def __init__(self, fp):
-        self.data = self.loadData(fp)
-
-    def loadData(self, fp):
-        data = []
-        for line in open(fp, "r"):
-            data.append(tuple(map(int, line.strip().split("::")[:2])))
-        return data
-
-    def splitData(self, M, K):
-        train, test = [], []
-        random.seed(1)
-        for user, item in self.data:
-            if random.randint(0, M-1) == K:
-                test.append((user, item))
-            else:
-                train.append((user, item))
-
-        def convert_dict(data):
-            dict_data = {}
-            for user, item in data:
-                if user not in dict_data:
-                    dict_data[user] = set()
-                dict_data[user].add(item)
-            dict_data = {k: list(v) for k, v in dict_data.items()}
-            return dict_data
-
-        return convert_dict(train), convert_dict(test)
-
-class Metric():
-
-    def __init__(self, train, test, GetRecommendation):
-        self.train = train
-        self.test = test
-        self.GetRecommendation = GetRecommendation
-        self.recs = self.getRec()
-
-    def getRec(self):
-        recs = {}
-        for user in self.test:
-            recs[user] = self.GetRecommendation(user)
-        return recs
-
-    def precision(self):
-        total, hit = 0, 0
-        for user in self.test:
-            test_items = set(self.test[user])
-            for item, _ in self.recs[user]:
-                if item in test_items:
-                    hit += 1
-                total += 1
-        return round(hit / total * 100, 2)
-
-    def recall(self):
-        total, hit = 0, 0
-        for user in self.test:
-            test_items = set(self.test[user])
-            for item, _ in self.recs[user]:
-                if item in test_items:
-                    hit += 1
-            total += len(test_items)
-        return round(hit / total * 100, 2)
-
-    def eval(self):
-        metric = {
-            "Precision": self.precision(),
-            "Recall": self.recall()
-        }
-        print("Metric:", metric)
-        return metric
 
 def LFM(train, K, N, lr, step, ratio, lmbda):
     """
@@ -95,6 +25,7 @@ def LFM(train, K, N, lr, step, ratio, lmbda):
     items = [x[0] for x in all_items]
     pops = [x[1] for x in all_items]
 
+    # 负样本降采样
     def nSamples(data):
         new_data = {}
         for user in data:
@@ -169,7 +100,7 @@ class Experiment():
         :return: 各指标的值
         '''
         getRecommendation = self.LFM(train, self.K, self.N, self.lr, self.step, self.ratio, self.lmbda)
-        metric = Metric(train, test, getRecommendation)
+        metric = Metrics(train, test, getRecommendation)
         return metric.eval()
 
     # 多次实验取平均
